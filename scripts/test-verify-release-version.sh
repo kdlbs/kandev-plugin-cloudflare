@@ -56,5 +56,17 @@ package_file=$(cd "$test_dir/matching-package" && make -s package-file)
 tar -czf "$test_dir/matching-package/$package_file" -C "$test_dir/matching-package/archive" manifest.yaml
 (cd "$test_dir/matching-package" && sh "$verify_script" "v$base_version" "$package_file")
 
+# plugin-pack emits an unquoted version scalar in the archive manifest.
+make_fixture serialized-package
+mkdir -p "$test_dir/serialized-package/archive"
+sed 's/^version: "\(.*\)"$/version: \1/' "$test_dir/serialized-package/manifest.yaml" > "$test_dir/serialized-package/archive/manifest.yaml"
+package_file=$(cd "$test_dir/serialized-package" && make -s package-file)
+tar -czf "$test_dir/serialized-package/$package_file" -C "$test_dir/serialized-package/archive" manifest.yaml
+(cd "$test_dir/serialized-package" && sh "$verify_script" "v$base_version" "$package_file")
+sed "s/^version: $base_version$/version: $wrong_version/" "$test_dir/serialized-package/archive/manifest.yaml" > "$test_dir/serialized-package/archive/manifest.next"
+mv "$test_dir/serialized-package/archive/manifest.next" "$test_dir/serialized-package/archive/manifest.yaml"
+tar -czf "$test_dir/serialized-package/$package_file" -C "$test_dir/serialized-package/archive" manifest.yaml
+expect_failure 'an unquoted archive version that differs from the tag' "$test_dir/serialized-package" "v$base_version" "$package_file"
+
 expect_failure 'a non-version release tag' "$test_dir/valid" "release-$base_version"
 printf 'release version negative tests passed\n'
