@@ -7,7 +7,7 @@ and composer-reference surfaces without teaching an Acme-specific API.
 The default template deliberately does not activate or package this directory.
 `make package` copies only `manifest.yaml`, `ui/`, and the runtime binaries.
 Copy the pieces you need, supply concrete provider adapters, merge the manifest
-fragment, and raise `min_kandev_version` before publishing.
+fragment, and verify `min_kandev_version` before publishing.
 
 Contract references at the pinned source revision: [plugin authoring](https://github.com/kdlbs/kandev/blob/f0e2e774cfe2df8a0d15e4c21dea7b48580e38fb/docs/public/plugins-authoring.md),
 [manifest](https://github.com/kdlbs/kandev/blob/f0e2e774cfe2df8a0d15e4c21dea7b48580e38fb/docs/public/plugins-manifest.md),
@@ -151,7 +151,8 @@ timeouts, disconnects, and revoked access fail closed.
   access. Never put tokens in browser payloads, repository descriptors,
   snapshots, logs, cursors, or action responses.
 
-These contracts are included in public SDK `0.1.0`, whose release records declare `min_kandev_version: "0.99.0"`.
+These contracts are included in public SDK `0.1.0`, whose release records
+declare `min_kandev_version: "0.99.0"`.
 The manifest fragment and base template use that SDK-wide floor. Raise it for
 additional requirements and run `make sdk-check` after installing dependencies.
 

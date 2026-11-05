@@ -185,6 +185,7 @@ async function dismissFirstRunOnboarding(targetPage) {
   await targetPage.waitForFunction(
     () =>
       document.querySelector('[data-testid="sidebar-quick-chat-shortcut"]') ||
+      document.querySelector('[data-testid="app-nav-trigger"]') ||
       [...document.querySelectorAll("h1, h2, h3")].some((heading) => heading.textContent?.trim() === "AI Agents"),
     undefined,
     { timeout: 15000 },

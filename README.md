@@ -72,7 +72,7 @@ registrations are one contract.
 The page in `ui/bundle.js` is deliberately built from independent parts —
 `AboutPopover`, the `Progress` block, `RecentTasksTable`, `EmptyState`, the
 Clear button — so you can delete any of them without unpicking the others.
-Adjust `min_kandev_version` in `manifest.yaml` to match whatever you keep.
+Keep `min_kandev_version` at least at the installed SDK floor, even if you remove features.
 The Action recipes and repository conventions are in
 [docs/repository-baseline.md](docs/repository-baseline.md).
 
@@ -335,7 +335,7 @@ In GitHub Actions, open the release workflow from `main`. Choose a version
 bump. Set `dry_run` to `true` to preview the version without publishing.
 
 The tag path requires the tag, manifest version, Makefile version, and package
-manifest to match. To change the SDK source pin, select an exact reviewed host
+manifest to match. To change packaging tools, select an exact reviewed host
 commit, update `.kandev-tooling-ref`, then run the documented packaging checks. Do not infer
 a runtime release number from that source commit.
 

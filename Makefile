@@ -2,6 +2,8 @@
 	test-release-version typecheck-recipes audit-recipes check-format fmt vet \
 	sdk-check package package-host package-file verify-package verify-package-host clean
 
+.DEFAULT_GOAL := build
+
 # When you rename the plugin, update BIN and VERSION to match manifest.yaml's
 # id and version (PKG_OUT is derived from them).
 BIN := bin/kandev-plugin-template
