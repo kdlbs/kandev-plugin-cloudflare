@@ -82,6 +82,30 @@ done
 write_checksums "$host_fixture"
 sh "$verify_script" "$host_fixture" host "$host_platform" >/dev/null
 
+# Current plugin-pack reserializes YAML with four-space indentation and
+# unquoted scalar paths, and narrows host-only manifests to one executable.
+copy_fixture serialized-full
+sed -e 's/^  /    /' -e 's/^      /        /' -e 's/"//g' \
+	"$test_dir/serialized-full/manifest.yaml" > "$test_dir/serialized-full/manifest.next"
+mv "$test_dir/serialized-full/manifest.next" "$test_dir/serialized-full/manifest.yaml"
+write_checksums "$test_dir/serialized-full"
+sh "$verify_script" "$test_dir/serialized-full" full >/dev/null
+
+mkdir -p "$test_dir/serialized-host"
+cp -R "$host_fixture/." "$test_dir/serialized-host/"
+cat > "$test_dir/serialized-host/manifest.yaml" <<EOF
+api_version: 1
+runtime:
+    type: binary
+    executables:
+        $host_platform: $host_executable
+min_kandev_version: 0.99.0
+EOF
+write_checksums "$test_dir/serialized-host"
+sh "$verify_script" "$test_dir/serialized-host" host "$host_platform" >/dev/null
+expect_failure 'host-only metadata used as a full package' "$test_dir/serialized-host"
+expect_failure 'host-only metadata for another platform' "$test_dir/serialized-host" host freebsd-amd64
+
 for required in manifest.yaml ui/bundle.js \
 	server/plugin-linux-amd64 server/plugin-linux-arm64 \
 	server/plugin-darwin-amd64 server/plugin-darwin-arm64 \

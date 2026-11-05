@@ -21,28 +21,41 @@ jobs:
         with:
           path: plugin
 
-      - name: Read pinned Kandev source revision
-        id: sdk
+      - name: Read pinned packaging tool revision
+        id: tooling
         working-directory: plugin
         run: |
           set -euo pipefail
-          sdk_ref="$(cat .kandev-sdk-ref)"
-          [[ "$sdk_ref" =~ ^[0-9a-f]{40}$ ]]
-          echo "ref=$sdk_ref" >> "$GITHUB_OUTPUT"
+          tooling_ref="$(cat .kandev-tooling-ref)"
+          [[ "$tooling_ref" =~ ^[0-9a-f]{40}$ ]]
+          echo "ref=$tooling_ref" >> "$GITHUB_OUTPUT"
 
-      - name: Check out kandev SDK contract
+      - name: Check out packaging tools
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           repository: kdlbs/kandev
-          path: kandev
-          ref: ${{ steps.sdk.outputs.ref }}
-          sparse-checkout: apps/backend
+          path: kandev-tooling
+          ref: ${{ steps.tooling.outputs.ref }}
+          sparse-checkout: |
+            apps/backend
+            pluginsdk
 
       - name: Set up Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: plugin/go.mod
           cache-dependency-path: plugin/go.sum
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: plugin/package-lock.json
+
+      - name: Install locked frontend SDK
+        working-directory: plugin
+        run: npm ci --ignore-scripts
 
       - name: Build host binary
         working-directory: plugin
@@ -51,3 +64,59 @@ jobs:
       - name: Package and validate all supported platforms
         working-directory: plugin
         run: make verify-package
+
+      - name: Smoke packaged plugin on minimum host 0.99.0
+        working-directory: plugin
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          smoke_dir="$(mktemp -d)"
+          gh release download v0.99.0 --repo kdlbs/kandev \
+            --pattern kandev-linux-x64.tar.gz --pattern kandev-linux-x64.tar.gz.sha256 \
+            --dir "$smoke_dir"
+          (cd "$smoke_dir" && sha256sum -c kandev-linux-x64.tar.gz.sha256)
+          tar -xzf "$smoke_dir/kandev-linux-x64.tar.gz" -C "$smoke_dir"
+          mkdir -p "$smoke_dir"/{home,tmp,empty-cwd,xdg/data,xdg/config,xdg/cache,xdg/state}
+          (
+            cd "$smoke_dir/empty-cwd"
+            exec env -i PATH="$PATH" HOME="$smoke_dir/home" TMPDIR="$smoke_dir/tmp" \
+              XDG_DATA_HOME="$smoke_dir/xdg/data" XDG_CONFIG_HOME="$smoke_dir/xdg/config" \
+              XDG_CACHE_HOME="$smoke_dir/xdg/cache" XDG_STATE_HOME="$smoke_dir/xdg/state" \
+              LANG=C.UTF-8 KANDEV_SERVER_HOST=127.0.0.1 \
+              "$smoke_dir/kandev/bin/kandev" run --headless --port 28843
+          ) > "$smoke_dir/host.log" 2>&1 &
+          host_pid=$!
+          trap 'kill "$host_pid" 2>/dev/null || true; cat "$smoke_dir/host.log"' EXIT
+          for attempt in $(seq 1 90); do
+            curl --silent --fail http://127.0.0.1:28843/health && break
+            kill -0 "$host_pid"
+            sleep 1
+          done
+          curl --fail --show-error -F "package=@$(make -s package-file);type=application/gzip" \
+            http://127.0.0.1:28843/api/plugins/install
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const base = 'http://127.0.0.1:28843';
+          const plugin = '/api/plugins/kandev-plugin-template';
+          async function request(path, method = 'GET', body) {
+            const response = await fetch(base + path, {
+              method, headers: { 'Content-Type': 'application/json' },
+              body: body === undefined ? undefined : JSON.stringify(body),
+            });
+            assert.equal(response.status, 200, `${method} ${path}`);
+            return response;
+          }
+          assert.equal((await (await request('/health')).json()).version, 'v0.99.0');
+          assert.equal((await (await request(plugin)).json()).status, 'active');
+          assert.equal(await (await request(plugin + '/webhooks/ping', 'POST')).text(), 'Hello, webhook!');
+          await request(plugin, 'PATCH', { config: { greeting: 'Migration' } });
+          assert.equal(await (await request(plugin + '/webhooks/ping', 'POST')).text(), 'Migration, webhook!');
+          assert.equal((await fetch(base + plugin + '/webhooks/undeclared', { method: 'POST' })).status, 404);
+          await request(plugin + '/disable', 'POST');
+          assert.equal((await (await request(plugin)).json()).status, 'disabled');
+          await request(plugin + '/enable', 'POST');
+          assert.equal((await (await request(plugin)).json()).status, 'active');
+          assert.equal(await (await request(plugin + '/webhooks/ping', 'POST')).text(), 'Migration, webhook!');
+          console.log('Minimum-host install, config/restart, webhook, and lifecycle smoke passed');
+          JS
