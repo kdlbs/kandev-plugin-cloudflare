@@ -1,0 +1,80 @@
+{
+  "hostVersion": "v0.99.0",
+  "servedWebAssets": {
+    "sourceCommit": "f0e2e774cfe2df8a0d15e4c21dea7b48580e38fb",
+    "hostAssetSource": "embedded",
+    "filesCompared": 671,
+    "bytesCompared": 62997509,
+    "treeSha256": "4eb311004e41241262a68cd39c3b7a2d45080e4bf815e044cd5c45788f45c6c4",
+    "shellReferencesCompared": 86,
+    "shellReferencesSha256": "c26a52e2d7cc80d2e37d922a40a5aa46f3b41db200e68d58b21c2e889e3d4d9d"
+  },
+  "results": [
+    {
+      "case": "desktop Chromium",
+      "accessibleName": "Template \u2014 open page",
+      "bounds": {
+        "x": 1029,
+        "y": 861,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "case": "keyboard focus and Enter navigation",
+      "passed": true
+    },
+    {
+      "case": "disable removes the composer registration",
+      "actionCount": 0
+    },
+    {
+      "case": "re-enable restores one registration",
+      "actionCount": 1
+    },
+    {
+      "case": "desktop Quick Chat opening composer, no task/session scope, disabled send, keyboard navigation",
+      "bounds": {
+        "x": 991,
+        "y": 512.5,
+        "width": 28,
+        "height": 28
+      },
+      "sendDisabled": true,
+      "actionDisabled": false,
+      "taskContext": null,
+      "presentation": "desktop"
+    },
+    {
+      "case": "Pixel 5 task composer touch, target size, fit, and navigation",
+      "bounds": {
+        "x": 280,
+        "y": 612,
+        "width": 44,
+        "height": 44
+      },
+      "width": 393,
+      "documentWidth": 393,
+      "coarsePointer": true,
+      "touchPoints": 1
+    },
+    {
+      "case": "Pixel 5 Quick Chat opening composer, no task/session scope, disabled send, touch navigation",
+      "bounds": {
+        "x": 279,
+        "y": 434,
+        "width": 44,
+        "height": 44
+      },
+      "sendDisabled": true,
+      "actionDisabled": false,
+      "taskContext": null,
+      "presentation": "mobile",
+      "width": 393,
+      "documentWidth": 393,
+      "coarsePointer": true,
+      "touchPoints": 1
+    }
+  ],
+  "pageErrors": []
+}

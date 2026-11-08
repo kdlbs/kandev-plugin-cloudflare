@@ -207,7 +207,8 @@ go run github.com/kdlbs/kandev/pluginsdk/cmd/kandev-sdk-check@v0.1.0 \
 The Go and npm SDKs share independent SDK versioning. Their version is separate
 from this plugin's version, manifest API version, and Kandev host release.
 For deliberate upgrades, verify public release records, update both exact
-pins, regenerate `go.sum` and `package-lock.json`, inspect the new SDK-wide
+pins and `Makefile`'s `KANDEV_SDK_VERSION` checker pin, regenerate `go.sum`
+and `package-lock.json`, inspect the new SDK-wide
 minimum and supported APIs, then rerun compatibility, tests, packaging, and
 minimum-host smoke checks. Do not substitute `file:`, `link:`, or Go replacements.
 

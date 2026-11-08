@@ -89,10 +89,11 @@ jobs:
           host_pid=$!
           trap 'kill "$host_pid" 2>/dev/null || true; cat "$smoke_dir/host.log"' EXIT
           for attempt in $(seq 1 90); do
-            curl --silent --fail http://127.0.0.1:28843/health && break
+            curl --silent --fail http://127.0.0.1:28843/ready && break
             kill -0 "$host_pid"
             sleep 1
           done
+          curl --fail --show-error http://127.0.0.1:28843/ready
           curl --fail --show-error -F "package=@$(make -s package-file);type=application/gzip" \
             http://127.0.0.1:28843/api/plugins/install
           node --input-type=module <<'JS'

@@ -182,19 +182,35 @@ async function openQuickChat(targetPage, mobile = false) {
 
 async function dismissFirstRunOnboarding(targetPage) {
   await targetPage.goto(`${baseURL}/`, { waitUntil: "domcontentloaded" });
-  await targetPage.waitForFunction(
-    () =>
-      document.querySelector('[data-testid="sidebar-quick-chat-shortcut"]') ||
-      document.querySelector('[data-testid="app-nav-trigger"]') ||
-      [...document.querySelectorAll("h1, h2, h3")].some((heading) => heading.textContent?.trim() === "AI Agents"),
+  const readyState = await targetPage.waitForFunction(
+    () => {
+      const visible = (element) =>
+        element && element.getClientRects().length > 0 && getComputedStyle(element).visibility !== "hidden";
+      const agentsHeading = [...document.querySelectorAll("h1, h2, h3")].find(
+        (heading) => heading.textContent?.trim() === "AI Agents" && visible(heading),
+      );
+      if (agentsHeading) return "onboarding";
+      // Desktop stores this after Skip completes; mobile inherits that storage
+      // state. A mounted navigation control alone can precede the dialog.
+      if (localStorage.getItem("kandev.onboarding.completed") !== "true") return false;
+      return [...document.querySelectorAll(
+        '[data-testid="sidebar-quick-chat-shortcut"], [data-testid="app-nav-trigger"]',
+      )].some(visible) ? "ready" : false;
+    },
     undefined,
     { timeout: 15000 },
   );
-  const agentsStep = targetPage.getByRole("heading", { name: "AI Agents", exact: true });
-  if (await agentsStep.count()) {
+  if ((await readyState.jsonValue()) === "onboarding") {
+    const agentsStep = targetPage.getByRole("heading", { name: "AI Agents", exact: true });
     await targetPage.getByRole("button", { name: "Skip", exact: true }).click();
     await agentsStep.waitFor({ state: "detached", timeout: 10000 });
+    await targetPage.waitForFunction(
+      () => localStorage.getItem("kandev.onboarding.completed") === "true",
+      undefined,
+      { timeout: 10000 },
+    );
   }
+  await readyState.dispose();
 }
 
 async function assertUnscopedQuickChatAction(targetPage, dialog, presentation) {

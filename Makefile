@@ -8,6 +8,7 @@
 # id and version (PKG_OUT is derived from them).
 BIN := bin/kandev-plugin-template
 VERSION := 0.1.0
+KANDEV_SDK_VERSION := 0.1.0
 STAGE := .build/stage
 PKG_OUT := $(notdir $(BIN))-$(VERSION).tar.gz
 
@@ -18,7 +19,7 @@ PKG_OUT := $(notdir $(BIN))-$(VERSION).tar.gz
 KANDEV_TOOLING ?= ../kandev-tooling/apps/backend
 
 sdk-check:
-	go run github.com/kdlbs/kandev/pluginsdk/cmd/kandev-sdk-check@v0.1.0 --manifest manifest.yaml --frontend-sdk node_modules/@kdlbs/plugin-sdk
+	go run github.com/kdlbs/kandev/pluginsdk/cmd/kandev-sdk-check@v$(KANDEV_SDK_VERSION) --manifest manifest.yaml --frontend-sdk node_modules/@kdlbs/plugin-sdk
 
 ## Build the plugin binary for the host platform (development use). kandev
 ## itself always installs from `make package`/`package-host` output, not this.

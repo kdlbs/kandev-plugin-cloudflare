@@ -91,6 +91,14 @@ mv "$test_dir/serialized-full/manifest.next" "$test_dir/serialized-full/manifest
 write_checksums "$test_dir/serialized-full"
 sh "$verify_script" "$test_dir/serialized-full" full >/dev/null
 
+# A runtime sibling after executables must not become a platform entry.
+copy_fixture reordered-runtime
+sed '/^  type: binary$/d' "$test_dir/reordered-runtime/manifest.yaml" > "$test_dir/reordered-runtime/manifest.next"
+printf '  type: binary\n' >> "$test_dir/reordered-runtime/manifest.next"
+mv "$test_dir/reordered-runtime/manifest.next" "$test_dir/reordered-runtime/manifest.yaml"
+write_checksums "$test_dir/reordered-runtime"
+sh "$verify_script" "$test_dir/reordered-runtime" full >/dev/null
+
 mkdir -p "$test_dir/serialized-host"
 cp -R "$host_fixture/." "$test_dir/serialized-host/"
 cat > "$test_dir/serialized-host/manifest.yaml" <<EOF
@@ -104,7 +112,9 @@ EOF
 write_checksums "$test_dir/serialized-host"
 sh "$verify_script" "$test_dir/serialized-host" host "$host_platform" >/dev/null
 expect_failure 'host-only metadata used as a full package' "$test_dir/serialized-host"
-expect_failure 'host-only metadata for another platform' "$test_dir/serialized-host" host freebsd-amd64
+other_platform=darwin-arm64
+[ "$host_platform" != "$other_platform" ] || other_platform=linux-amd64
+expect_failure 'host-only metadata for another supported platform' "$test_dir/serialized-host" host "$other_platform"
 
 for required in manifest.yaml ui/bundle.js \
 	server/plugin-linux-amd64 server/plugin-linux-arm64 \

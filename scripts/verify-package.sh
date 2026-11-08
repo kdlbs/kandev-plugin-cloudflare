@@ -24,7 +24,12 @@ done
 manifest_executables=$(awk '
 	$0 == "runtime:" { in_runtime = 1; next }
 	in_runtime && /^[^[:space:]#]/ { exit }
-	in_runtime && /^[[:space:]]+executables:/ { in_executables = 1; next }
+	in_runtime && /^[[:space:]]+executables:/ {
+		in_executables = 1
+		executables_indent = match($0, /[^[:space:]]/) - 1
+		next
+	}
+	in_executables && /^[[:space:]]*[^[:space:]#]/ && match($0, /[^[:space:]]/) - 1 <= executables_indent { exit }
 	in_executables && /^[[:space:]]+[[:alnum:]_-]+:[[:space:]]+[^[:space:]]+$/ {
 		platform = $1
 		sub(/:$/, "", platform)
