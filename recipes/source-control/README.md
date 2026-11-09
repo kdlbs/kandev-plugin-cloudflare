@@ -7,12 +7,12 @@ and composer-reference surfaces without teaching an Acme-specific API.
 The default template deliberately does not activate or package this directory.
 `make package` copies only `manifest.yaml`, `ui/`, and the runtime binaries.
 Copy the pieces you need, supply concrete provider adapters, merge the manifest
-fragment, and raise `min_kandev_version` before publishing.
+fragment, and verify `min_kandev_version` before publishing.
 
-Contract references at the pinned source revision: [plugin authoring](https://github.com/kdlbs/kandev/blob/f218880ecbaa3d019d65b5d84fca6bdf160eced6/docs/public/plugins-authoring.md),
-[manifest](https://github.com/kdlbs/kandev/blob/f218880ecbaa3d019d65b5d84fca6bdf160eced6/docs/public/plugins-manifest.md),
-[frontend SDK](https://github.com/kdlbs/kandev/blob/f218880ecbaa3d019d65b5d84fca6bdf160eced6/apps/packages/plugin-sdk/src/index.ts),
-and [backend SDK extensions](https://github.com/kdlbs/kandev/blob/f218880ecbaa3d019d65b5d84fca6bdf160eced6/apps/backend/pkg/pluginsdk/plugin.go).
+Contract references at the pinned source revision: [plugin authoring](https://github.com/kdlbs/kandev/blob/f0e2e774cfe2df8a0d15e4c21dea7b48580e38fb/docs/public/plugins-authoring.md),
+[manifest](https://github.com/kdlbs/kandev/blob/f0e2e774cfe2df8a0d15e4c21dea7b48580e38fb/docs/public/plugins-manifest.md),
+[frontend SDK](https://github.com/kdlbs/kandev/blob/f0e2e774cfe2df8a0d15e4c21dea7b48580e38fb/apps/packages/plugin-sdk/src/index.ts),
+and [backend SDK extensions](https://github.com/kdlbs/kandev/blob/f0e2e774cfe2df8a0d15e4c21dea7b48580e38fb/pluginsdk/plugin.go).
 
 ## What belongs where
 
@@ -151,11 +151,10 @@ timeouts, disconnects, and revoked access fail closed.
   access. Never put tokens in browser payloads, repository descriptors,
   snapshots, logs, cursors, or action responses.
 
-At this recipe's introduction, the contracts were present at Kandev source
-commit `f218880ecbaa3d019d65b5d84fca6bdf160eced6` after release `v0.87.1`; no
-release tag contained them yet. Pin development/CI to a known source contract,
-then set `min_kandev_version` to the first release that contains it. Do not use
-the base template's `0.86.0` floor for an activated provider recipe.
+These contracts are included in public SDK `0.1.0`, whose release records
+declare `min_kandev_version: "0.99.0"`.
+The manifest fragment and base template use that SDK-wide floor. Raise it for
+additional requirements and run `make sdk-check` after installing dependencies.
 
 ## Verification
 

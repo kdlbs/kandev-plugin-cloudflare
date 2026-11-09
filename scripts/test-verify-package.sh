@@ -82,6 +82,40 @@ done
 write_checksums "$host_fixture"
 sh "$verify_script" "$host_fixture" host "$host_platform" >/dev/null
 
+# Current plugin-pack reserializes YAML with four-space indentation and
+# unquoted scalar paths, and narrows host-only manifests to one executable.
+copy_fixture serialized-full
+sed -e 's/^  /    /' -e 's/^      /        /' -e 's/"//g' \
+	"$test_dir/serialized-full/manifest.yaml" > "$test_dir/serialized-full/manifest.next"
+mv "$test_dir/serialized-full/manifest.next" "$test_dir/serialized-full/manifest.yaml"
+write_checksums "$test_dir/serialized-full"
+sh "$verify_script" "$test_dir/serialized-full" full >/dev/null
+
+# A runtime sibling after executables must not become a platform entry.
+copy_fixture reordered-runtime
+sed '/^  type: binary$/d' "$test_dir/reordered-runtime/manifest.yaml" > "$test_dir/reordered-runtime/manifest.next"
+printf '  type: binary\n' >> "$test_dir/reordered-runtime/manifest.next"
+mv "$test_dir/reordered-runtime/manifest.next" "$test_dir/reordered-runtime/manifest.yaml"
+write_checksums "$test_dir/reordered-runtime"
+sh "$verify_script" "$test_dir/reordered-runtime" full >/dev/null
+
+mkdir -p "$test_dir/serialized-host"
+cp -R "$host_fixture/." "$test_dir/serialized-host/"
+cat > "$test_dir/serialized-host/manifest.yaml" <<EOF
+api_version: 1
+runtime:
+    type: binary
+    executables:
+        $host_platform: $host_executable
+min_kandev_version: 0.99.0
+EOF
+write_checksums "$test_dir/serialized-host"
+sh "$verify_script" "$test_dir/serialized-host" host "$host_platform" >/dev/null
+expect_failure 'host-only metadata used as a full package' "$test_dir/serialized-host"
+other_platform=darwin-arm64
+[ "$host_platform" != "$other_platform" ] || other_platform=linux-amd64
+expect_failure 'host-only metadata for another supported platform' "$test_dir/serialized-host" host "$other_platform"
+
 for required in manifest.yaml ui/bundle.js \
 	server/plugin-linux-amd64 server/plugin-linux-arm64 \
 	server/plugin-darwin-amd64 server/plugin-darwin-arm64 \

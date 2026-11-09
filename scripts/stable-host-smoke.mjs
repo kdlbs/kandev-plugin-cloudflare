@@ -10,8 +10,8 @@ import { dirname, resolve } from "node:path";
 
 const baseURL = process.env.KANDEV_URL ?? "http://127.0.0.1:18797";
 const taskPath = process.env.KANDEV_SMOKE_TASK_PATH;
-const expectedVersion = process.env.KANDEV_EXPECTED_VERSION ?? "v0.97.0";
-const expectedReleaseCommit = "e43881c7555372897b57ec51c705f1e05da43c40";
+const expectedVersion = process.env.KANDEV_EXPECTED_VERSION ?? "v0.99.0";
+const expectedReleaseCommit = "f0e2e774cfe2df8a0d15e4c21dea7b48580e38fb";
 const releaseSource = process.env.KANDEV_RELEASE_SOURCE;
 const hostLogPath = process.env.KANDEV_SMOKE_HOST_LOG;
 const screenshotDir = process.env.KANDEV_SMOKE_SCREENSHOTS ?? "/tmp/kandev-plugin-smoke";
@@ -23,7 +23,7 @@ if (!taskPath?.startsWith("/t/")) {
   throw new Error("Set KANDEV_SMOKE_TASK_PATH to a task route with a composer.");
 }
 if (!releaseSource) {
-  throw new Error("Set KANDEV_RELEASE_SOURCE to the detached Kandev v0.97.0 source checkout.");
+  throw new Error("Set KANDEV_RELEASE_SOURCE to the detached Kandev v0.99.0 source checkout.");
 }
 if (!hostLogPath) {
   throw new Error("Set KANDEV_SMOKE_HOST_LOG to the task-owned runtime backend log.");
@@ -33,7 +33,7 @@ const releaseRoot = resolve(releaseSource);
 const releaseCommit = execFileSync("git", ["-C", releaseRoot, "rev-parse", "HEAD"], {
   encoding: "utf8",
 }).trim();
-assert.equal(releaseCommit, expectedReleaseCommit, "release source is the exact v0.97.0 commit");
+assert.equal(releaseCommit, expectedReleaseCommit, "release source is the exact v0.99.0 commit");
 execFileSync("git", ["-C", releaseRoot, "diff", "--quiet"]);
 execFileSync("git", ["-C", releaseRoot, "diff", "--cached", "--quiet"]);
 const releaseWebDist = resolve(releaseRoot, "apps/web/dist");
@@ -125,7 +125,7 @@ async function verifyServedReleaseAssets() {
       const assetResponse = await fetch(`${baseURL}/${urlPath}`);
       assert.equal(assetResponse.status, 200, `host serves release asset ${relative}`);
       const servedBytes = Buffer.from(await assetResponse.arrayBuffer());
-      assert.deepEqual(servedBytes, sourceBytes, `served asset matches v0.97.0 build: ${relative}`);
+      assert.deepEqual(servedBytes, sourceBytes, `served asset matches v0.99.0 build: ${relative}`);
       fileDigests[index] = createHash("sha256").update(sourceBytes).digest("hex");
       totalBytes += sourceBytes.length;
     }
@@ -182,18 +182,35 @@ async function openQuickChat(targetPage, mobile = false) {
 
 async function dismissFirstRunOnboarding(targetPage) {
   await targetPage.goto(`${baseURL}/`, { waitUntil: "domcontentloaded" });
-  await targetPage.waitForFunction(
-    () =>
-      document.querySelector('[data-testid="sidebar-quick-chat-shortcut"]') ||
-      [...document.querySelectorAll("h1, h2, h3")].some((heading) => heading.textContent?.trim() === "AI Agents"),
+  const readyState = await targetPage.waitForFunction(
+    () => {
+      const visible = (element) =>
+        element && element.getClientRects().length > 0 && getComputedStyle(element).visibility !== "hidden";
+      const agentsHeading = [...document.querySelectorAll("h1, h2, h3")].find(
+        (heading) => heading.textContent?.trim() === "AI Agents" && visible(heading),
+      );
+      if (agentsHeading) return "onboarding";
+      // Desktop stores this after Skip completes; mobile inherits that storage
+      // state. A mounted navigation control alone can precede the dialog.
+      if (localStorage.getItem("kandev.onboarding.completed") !== "true") return false;
+      return [...document.querySelectorAll(
+        '[data-testid="sidebar-quick-chat-shortcut"], [data-testid="app-nav-trigger"]',
+      )].some(visible) ? "ready" : false;
+    },
     undefined,
     { timeout: 15000 },
   );
-  const agentsStep = targetPage.getByRole("heading", { name: "AI Agents", exact: true });
-  if (await agentsStep.count()) {
+  if ((await readyState.jsonValue()) === "onboarding") {
+    const agentsStep = targetPage.getByRole("heading", { name: "AI Agents", exact: true });
     await targetPage.getByRole("button", { name: "Skip", exact: true }).click();
     await agentsStep.waitFor({ state: "detached", timeout: 10000 });
+    await targetPage.waitForFunction(
+      () => localStorage.getItem("kandev.onboarding.completed") === "true",
+      undefined,
+      { timeout: 10000 },
+    );
   }
+  await readyState.dispose();
 }
 
 async function assertUnscopedQuickChatAction(targetPage, dialog, presentation) {

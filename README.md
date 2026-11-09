@@ -72,7 +72,7 @@ registrations are one contract.
 The page in `ui/bundle.js` is deliberately built from independent parts —
 `AboutPopover`, the `Progress` block, `RecentTasksTable`, `EmptyState`, the
 Clear button — so you can delete any of them without unpicking the others.
-Adjust `min_kandev_version` in `manifest.yaml` to match whatever you keep.
+Keep `min_kandev_version` at least at the installed SDK floor, even if you remove features.
 The Action recipes and repository conventions are in
 [docs/repository-baseline.md](docs/repository-baseline.md).
 
@@ -108,7 +108,7 @@ list is `PLUGIN_UI` in `apps/web/lib/plugins/host-api.ts`.
 The manifest uses `api_version: 1` and sets `access: "public"` explicitly.
 For API v1, an omitted access field keeps the legacy public default. Current
 API v2 uses an authenticated default. Keep the explicit value when you adapt
-the manifest. Read the [pinned authoring contract](https://github.com/kdlbs/kandev/blob/570600439036e81f8e9e1c63f15c4abce8a6c846/docs/public/plugins-authoring.md)
+the manifest. Read the [pinned authoring contract](https://github.com/kdlbs/kandev/blob/f0e2e774cfe2df8a0d15e4c21dea7b48580e38fb/docs/public/plugins-authoring.md)
 for the current rules.
 
 ```yaml
@@ -135,19 +135,11 @@ authorizes those and passes a verified resource context to your backend, and
 
 ## Minimum host version
 
-`manifest.yaml` declares `min_kandev_version: "0.86.0"` — the first release
-carrying the `host.ui` primitives, `host.toast` and `host.utils` that
-`ui/bundle.js` calls. A release host compares it against its own version at
-install time and refuses an older one, so an operator gets a clear error
-instead of a plugin that loads and then breaks on a missing API.
-
-Raise it as you adopt newer host APIs; lower or drop it if you strip the bundle
-back to the pre-0.86 surface (`Button`, `Card*`, `Tooltip*`).
-
-The source-control recipe uses post-v0.87.1 contracts and therefore cannot use
-this default `0.86.0` floor. Its README records the pinned source contract; set
-an activated provider plugin's minimum to the first release containing those
-hooks.
+`manifest.yaml` declares `min_kandev_version: "0.99.0"`, the SDK-wide
+minimum recorded by both public SDK 0.1.0 packages in `sdk-release.json`.
+The source-control recipe uses the same minimum. Keep this floor even when
+a plugin uses only older SDK features; raise it for newer host requirements.
+The manifest stays on API v1, supported by this SDK's `api_versions: [1, 2]`.
 
 Two caveats worth knowing:
 
@@ -191,43 +183,49 @@ credentials can separately implement `GitCredentialResolver` and
 
 ## Developing against the SDK
 
-`pkg/pluginsdk` is not published as its own module yet, so `go.mod` here uses a
-local `replace`:
+Go consumers import `github.com/kdlbs/kandev/pluginsdk` at `v0.1.0`.
+Frontend recipe types import `@kdlbs/plugin-sdk`, pinned exactly to `0.1.0`.
+Both are public packages; compilation, tests, and typechecking work in a
+standalone checkout without sibling SDK sources or local replacements.
+The default `ui/bundle.js` remains a dependency-free ES module.
 
-```
-replace github.com/kandev/kandev => ../kandev/apps/backend
-```
-
-This assumes your plugin repo is checked out as a **sibling** of the `kandev`
-monorepo. `.kandev-sdk-ref` records the exact source revision for Go and
-TypeScript contracts:
-
-```
-some-dir/
-├── kandev/                   # https://github.com/kdlbs/kandev, Go module at apps/backend/
-└── kandev-plugin-template/   # this repo
-```
-
-Use these commands to create the sibling layout and select the pinned source:
+Install dependencies and validate the installed SDK records before building:
 
 ```sh
-git clone https://github.com/kdlbs/kandev.git kandev
-git clone https://github.com/kdlbs/kandev-plugin-template.git kandev-plugin-template
-git -C kandev checkout "$(cat kandev-plugin-template/.kandev-sdk-ref)"
+npm ci --ignore-scripts
+go mod download
+make sdk-check
 ```
 
-Note the module root is `kandev/apps/backend`, not the repo root — `kandev` is
-a monorepo and the Go backend (including `pkg/pluginsdk`) lives one level down.
-Adjust the `replace` path if your layout differs. Once `pkg/pluginsdk` ships as
-a standalone, versioned module, this repo will drop the `replace` and pin a
-real version instead.
+`make sdk-check` runs the public versioned compatibility command:
 
-The frontend recipe follows the same source-checkout model through
-`@kandev/plugin-sdk` in `package.json`. It is a type-only dependency. The
-default `ui/bundle.js` remains a dependency-free ES module. CI, package builds,
-and releases read the same `.kandev-sdk-ref` file. This source pin is separate
-from `min_kandev_version` in the runtime manifest. The template keeps its
-`0.86.0` floor because it selects the legacy button when `Action` is absent.
+```sh
+go run github.com/kdlbs/kandev/pluginsdk/cmd/kandev-sdk-check@v0.1.0 \
+  --manifest manifest.yaml --frontend-sdk node_modules/@kdlbs/plugin-sdk
+```
+
+The Go and npm SDKs share independent SDK versioning. Their version is separate
+from this plugin's version, manifest API version, and Kandev host release.
+For deliberate upgrades, verify public release records, update both exact
+pins and `Makefile`'s `KANDEV_SDK_VERSION` checker pin, regenerate `go.sum`
+and `package-lock.json`, inspect the new SDK-wide
+minimum and supported APIs, then rerun compatibility, tests, packaging, and
+minimum-host smoke checks. Do not substitute `file:`, `link:`, or Go replacements.
+
+Packaging still requires backend-owned `plugin-pack`. `.kandev-tooling-ref`
+pins only this tooling source. Create an independent tooling checkout:
+
+```sh
+git clone --filter=blob:none --no-checkout https://github.com/kdlbs/kandev.git ../kandev-tooling
+git -C ../kandev-tooling sparse-checkout set apps/backend pluginsdk
+git -C ../kandev-tooling checkout "$(cat .kandev-tooling-ref)"
+make verify-package
+```
+
+The root `pluginsdk/` directory is needed by the backend's own replacement;
+the plugin's SDK dependencies still resolve publicly. To put tooling elsewhere,
+pass `KANDEV_TOOLING=/absolute/path/to/kandev-tooling/apps/backend` to make.
+SDK independence does not imply checkout-free packaging.
 
 ## Layout
 
@@ -294,19 +292,13 @@ computes `checksums.txt` and writes the archive. The verifier checks every
 manifest-declared binary, the UI bundle, the exact file list, and all checksums.
 It rejects recipe and development files even when their checksums are valid.
 
-The Makefile runs `plugin-pack` with `cd $(KANDEV_SDK) && go run
-./cmd/plugin-pack`, from inside the sibling kandev checkout, rather than as
-`go run github.com/kandev/kandev/cmd/plugin-pack` from here. The second
-spelling resolves plugin-pack's dependencies against *this* module's `go.sum`,
-and plugin-pack reaches much further into the kandev backend than `server/`
-does — so those entries are missing and packaging fails with `missing go.sum
-entry`. Pulling them in would force this template's `go.sum` to track every
-dependency the kandev backend grows. Building the tool where it lives keeps
-`go.sum` scoped to what your plugin actually imports.
+The Makefile runs `plugin-pack` in `KANDEV_TOOLING`, inside the separately
+pinned backend module. This keeps packaging dependencies out of the plugin's
+SDK-only Go graph. See “Developing against the SDK” for setup.
 
 ## Install it against a running Kandev
 
-The manifest requires Kandev 0.86.0 or later. It packages Linux amd64 and
+The manifest requires Kandev 0.99.0 or later. It packages Linux amd64 and
 arm64, macOS amd64 and arm64, and Windows amd64 binaries. It requests access to
 `task.created` events and plugin-scoped state. The `ping` webhook is public.
 
@@ -344,8 +336,8 @@ In GitHub Actions, open the release workflow from `main`. Choose a version
 bump. Set `dry_run` to `true` to preview the version without publishing.
 
 The tag path requires the tag, manifest version, Makefile version, and package
-manifest to match. To change the SDK source pin, select an exact reviewed host
-commit, update `.kandev-sdk-ref`, then run the documented checks. Do not infer
+manifest to match. To change packaging tools, select an exact reviewed host
+commit, update `.kandev-tooling-ref`, then run the documented packaging checks. Do not infer
 a runtime release number from that source commit.
 
 ## License
